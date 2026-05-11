@@ -1,6 +1,6 @@
 [package]
 name = "exira"
-version = "0.1.0"
+version = "0.2.0"
 description = "Exira: savings-backed efficiency financing on Solana"
 edition = "2021"
 

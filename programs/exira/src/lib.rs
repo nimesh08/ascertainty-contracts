@@ -81,6 +81,13 @@ pub mod exira {
         crate::instructions::admin::distribute_pool_returns::handler(ctx, amount)
     }
 
+    pub fn withdraw_project_funds(
+        ctx: Context<WithdrawProjectFunds>,
+        amount: u64,
+    ) -> Result<()> {
+        crate::instructions::admin::withdraw_project_funds::handler(ctx, amount)
+    }
+
     // ---------- Investor: buy / claim / withdraw ----------
 
     pub fn buy_project_tokens(ctx: Context<BuyProjectTokens>, amount: u64) -> Result<()> {

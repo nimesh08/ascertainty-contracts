@@ -6,3 +6,4 @@ pub mod close_project;
 pub mod create_pool;
 pub mod add_project_to_pool;
 pub mod distribute_pool_returns;
+pub mod withdraw_project_funds;

@@ -1866,3 +1866,156 @@ describe("t17: End-to-end integration", function () {
     expect(treasuryAfter - treasuryBefore).to.equal(BigInt(usdc(15).toString())); // 1.5% of 1000
   });
 });
+
+// ============================================================================
+// Admin withdraw_project_funds — vault drain escape hatch
+// ============================================================================
+describe("Admin: withdraw_project_funds", () => {
+  // Helper: fund a fresh project to its target and activate so the vault is non-empty.
+  // Returns { proj, fundedAmount } — fundedAmount is in base units, net of origination fee.
+  async function fundAndActivate(
+    mrvId: number,
+    projectId: number,
+    targetUsdc: number
+  ) {
+    await registerMrvAndBaseline(mrvId);
+    const proj = await createProject(projectId, mrvId, targetUsdc, 12);
+    const inv = await newWallet(5);
+    await mintUsdcTo(inv.publicKey, usdc(targetUsdc));
+    await buyProjectTokens(inv, proj, usdc(targetUsdc));
+    const vaultBeforeActivate = await getBal(proj.usdcVault);
+    await activateProject(proj);
+    const vaultAfterActivate = await getBal(proj.usdcVault);
+    return { proj, vaultAfterActivate, vaultBeforeActivate };
+  }
+
+  it("admin withdraws partial amount → vault decreases, destination increases", async () => {
+    const MRV = 18001, PID = 18001;
+    const { proj, vaultAfterActivate } = await fundAndActivate(MRV, PID, 1000);
+
+    const destOwner = Keypair.generate();
+    const destAta = await createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      usdcMint,
+      destOwner.publicKey
+    );
+
+    const destBefore = await getBal(destAta);
+    const withdrawAmount = usdc(400);
+
+    await program.methods
+      .withdrawProjectFunds(withdrawAmount)
+      .accountsPartial({
+        platform: platformPda(),
+        admin: admin.publicKey,
+        project: proj.pda,
+        usdcVault: proj.usdcVault,
+        destination: destAta,
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const vaultAfter = await getBal(proj.usdcVault);
+    const destAfter = await getBal(destAta);
+
+    expect(vaultAfterActivate - vaultAfter).to.equal(BigInt(withdrawAmount.toString()));
+    expect(destAfter - destBefore).to.equal(BigInt(withdrawAmount.toString()));
+  });
+
+  it("non-admin attempting withdraw → Unauthorized", async () => {
+    const MRV = 18002, PID = 18002;
+    const { proj } = await fundAndActivate(MRV, PID, 500);
+
+    const attacker = await newWallet(5);
+    const destAta = await createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      usdcMint,
+      attacker.publicKey
+    );
+    const pAtk = programFor(attacker);
+
+    try {
+      await pAtk.methods
+        .withdrawProjectFunds(usdc(10))
+        .accountsPartial({
+          platform: platformPda(),
+          admin: attacker.publicKey,
+          project: proj.pda,
+          usdcVault: proj.usdcVault,
+          destination: destAta,
+          usdcMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      expect.fail("expected withdraw_project_funds by non-admin to revert");
+    } catch (e: any) {
+      expect(String(e)).to.match(/Unauthorized|has_one/i);
+    }
+  });
+
+  it("over-withdraw (amount > vault) → InsufficientVaultBalance", async () => {
+    const MRV = 18003, PID = 18003;
+    const { proj, vaultAfterActivate } = await fundAndActivate(MRV, PID, 200);
+
+    const destOwner = Keypair.generate();
+    const destAta = await createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      usdcMint,
+      destOwner.publicKey
+    );
+
+    const tooMuch = new BN(vaultAfterActivate.toString()).addn(1);
+    try {
+      await program.methods
+        .withdrawProjectFunds(tooMuch)
+        .accountsPartial({
+          platform: platformPda(),
+          admin: admin.publicKey,
+          project: proj.pda,
+          usdcVault: proj.usdcVault,
+          destination: destAta,
+          usdcMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      expect.fail("expected over-withdraw to revert");
+    } catch (e: any) {
+      expect(String(e)).to.match(/InsufficientVaultBalance/i);
+    }
+  });
+
+  it("amount = 0 → ZeroAmount", async () => {
+    const MRV = 18004, PID = 18004;
+    const { proj } = await fundAndActivate(MRV, PID, 100);
+
+    const destOwner = Keypair.generate();
+    const destAta = await createAssociatedTokenAccountIdempotent(
+      connection,
+      admin,
+      usdcMint,
+      destOwner.publicKey
+    );
+
+    try {
+      await program.methods
+        .withdrawProjectFunds(new BN(0))
+        .accountsPartial({
+          platform: platformPda(),
+          admin: admin.publicKey,
+          project: proj.pda,
+          usdcVault: proj.usdcVault,
+          destination: destAta,
+          usdcMint,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      expect.fail("expected zero-amount withdraw to revert");
+    } catch (e: any) {
+      expect(String(e)).to.match(/ZeroAmount/i);
+    }
+  });
+});
