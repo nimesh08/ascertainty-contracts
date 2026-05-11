@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Exira — Devnet Test UI</title>
+  <style>
+    :root {
+      --bg: #0b0d11;
+      --fg: #e6e8eb;
+      --muted: #8b93a1;
+      --accent: #4ade80;
+      --border: #20242b;
+      --card: #151820;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: var(--bg);
+      color: var(--fg);
+      margin: 0;
+      padding: 24px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    h1 { font-size: 20px; margin: 0; }
+    h2 { font-size: 16px; margin: 0 0 12px; color: var(--accent); }
+    .muted { color: var(--muted); }
+    button {
+      background: var(--accent);
+      color: #0b0d11;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: #1f242c; color: var(--fg); border: 1px solid var(--border); }
+    input {
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 120px; }
+    .row > button { flex: 0; min-width: auto; }
+    pre {
+      background: var(--bg);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 0;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log {
+      max-height: 400px;
+      overflow-y: auto;
+      font-size: 12px;
+      background: var(--bg);
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .log-entry { margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry.error { color: #ef4444; }
+    .log-entry.success { color: var(--accent); }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+    .addr { word-break: break-all; color: var(--muted); font-size: 12px; }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Exira — Devnet Test UI</h1>
+      <p class="muted" style="margin: 4px 0 0;">
+        Program: <span class="mono">J7z1a2bwMEC8MchgZwskJZ8PzXg4UG674VgD8DuotJn2</span> · Network: Solana Devnet
+      </p>
+    </div>
+    <div>
+      <button id="connectBtn">Connect Phantom</button>
+      <span id="walletInfo" class="addr"></span>
+    </div>
+  </header>
+
+  <div class="card">
+    <h2>Platform status</h2>
+    <div id="platformStatus" class="mono">Loading…</div>
+    <div class="row" style="margin-top: 12px;">
+      <button class="secondary" onclick="refreshPlatform()">Refresh</button>
+      <button class="secondary" onclick="requestAirdrop()">Airdrop 2 SOL to me</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Admin panel -->
+    <div class="card">
+      <h2>Admin: MRV + Project</h2>
+
+      <div style="margin-bottom: 12px;">
+        <label>Register MRV project</label>
+        <div class="row">
+          <input id="mrvId" type="number" placeholder="mrv_id (e.g. 1)" />
+          <input id="mrvName" placeholder="MSME name" />
+        </div>
+        <button style="margin-top: 6px;" onclick="registerMrv()">Register</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Add auditor (self-wallet becomes auditor)</label>
+        <button onclick="addAuditorSelf()">Register self as auditor</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Submit baseline (requires auditor)</label>
+        <div class="row">
+          <input id="bMrvId" type="number" placeholder="mrv_id" />
+        </div>
+        <button style="margin-top: 6px;" onclick="submitBaseline()">Submit baseline</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Create project (requires admin + MRV with baseline)</label>
+        <div class="row">
+          <input id="pMrvId" type="number" placeholder="mrv_id" />
+          <input id="pPid" type="number" placeholder="project_id" />
+          <input id="pTarget" type="number" placeholder="target USDC (e.g. 100)" />
+          <input id="pTerm" type="number" placeholder="term months (6-60)" />
+        </div>
+        <button style="margin-top: 6px;" onclick="createProjectTx()">Create project</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Activate project</label>
+        <div class="row">
+          <input id="aPid" type="number" placeholder="project_id" />
+        </div>
+        <button style="margin-top: 6px;" onclick="activateProjectTx()">Activate</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Distribute repayment</label>
+        <div class="row">
+          <input id="dPid" type="number" placeholder="project_id" />
+          <input id="dAmt" type="number" placeholder="amount USDC" />
+        </div>
+        <button style="margin-top: 6px;" onclick="distributeTx()">Distribute</button>
+      </div>
+    </div>
+
+    <!-- Investor panel -->
+    <div class="card">
+      <h2>Investor actions</h2>
+
+      <div style="margin-bottom: 12px;">
+        <label>Buy project tokens</label>
+        <div class="row">
+          <input id="bPid" type="number" placeholder="project_id" />
+          <input id="bAmt" type="number" placeholder="amount USDC" />
+        </div>
+        <button style="margin-top: 6px;" onclick="buyTokensTx()">Buy</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Claim returns</label>
+        <div class="row">
+          <input id="cPid" type="number" placeholder="project_id" />
+        </div>
+        <button style="margin-top: 6px;" onclick="claimTx()">Claim</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Withdraw investment (Funding state only)</label>
+        <div class="row">
+          <input id="wPid" type="number" placeholder="project_id" />
+        </div>
+        <button style="margin-top: 6px;" onclick="withdrawTx()">Withdraw</button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label>Inspect project</label>
+        <div class="row">
+          <input id="iPid" type="number" placeholder="project_id" />
+        </div>
+        <button style="margin-top: 6px;" onclick="inspectProject()">Inspect</button>
+        <pre id="projectData" style="margin-top: 8px; max-height: 200px;"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Activity log</h2>
+    <div id="log" class="log"></div>
+  </div>
+
+  <div class="card">
+    <h2>Reference</h2>
+    <p><b>USDC Devnet faucet:</b> <a href="https://faucet.circle.com/" target="_blank" style="color: var(--accent);">https://faucet.circle.com/</a> (pick Solana Devnet, paste your wallet address)</p>
+    <p><b>SOL Devnet faucet:</b> <a href="https://faucet.solana.com/" target="_blank" style="color: var(--accent);">https://faucet.solana.com/</a></p>
+    <p><b>Explorer:</b> <a id="explorerLink" target="_blank" style="color: var(--accent);">View program on Solana Explorer</a></p>
+    <p><b>USDC Devnet mint:</b> <span class="mono">4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU</span></p>
+    <p><b>Platform PDA:</b> <span class="mono">YugaQS7oCazuuitbSLoDjNGRxpToaAq9cUp4dpXZiZD</span></p>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
