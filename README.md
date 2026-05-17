@@ -95,8 +95,8 @@ All versions align with the current Solana Foundation compatibility matrix at th
 ## Quickstart
 
 ```bash
-git clone https://github.com/nimesh08/exira-contracts.git
-cd exira-contracts
+git clone https://github.com/nimesh08/ascertainty-contracts.git
+cd ascertainty-contracts
 npm install
 anchor build
 ```
