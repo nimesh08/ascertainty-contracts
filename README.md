@@ -1,4 +1,4 @@
-# Exira Contracts
+# ascertainty Contracts
 
 Savings-backed energy-efficiency financing for Indian MSMEs, on Solana.
 
